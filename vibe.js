@@ -1,6 +1,6 @@
 /**
  * VIBE AGENT SDK v1.0 (MVP) - TiendaNube Edition
- * Optimistic UI + Mobile Touch Sensors + Fallback
+ * Optimistic UI + Mobile Touch Sensors + Fallback + Event Isolation
  */
 (function () {
     function _resolveApiEndpoint() {
@@ -58,7 +58,7 @@
     function initUI() {
         const style = document.createElement('style');
         const cssRules = [
-            ".vibe-toast { position: fixed; bottom: 24px; right: 24px; background: #ffffff; color: #1a1a1a; padding: 16px 20px; border-radius: 12px; box-shadow: 0 10px 40px -10px rgba(0,0,0,0.2); font-family: system-ui, sans-serif; font-size: 14px; z-index: 2147483647; transform: translateY(120px) scale(0.95); opacity: 0; transition: all 0.4s ease; display: flex; flex-direction: column; gap: 12px; border-left: 5px solid #1a1a1a; max-width: 340px; min-width: 280px; box-sizing: border-box; }",
+            ".vibe-toast { user-select: none; -webkit-user-select: none; position: fixed; bottom: 24px; right: 24px; background: #ffffff; color: #1a1a1a; padding: 16px 20px; border-radius: 12px; box-shadow: 0 10px 40px -10px rgba(0,0,0,0.2); font-family: system-ui, sans-serif; font-size: 14px; z-index: 2147483647; transform: translateY(120px) scale(0.95); opacity: 0; transition: all 0.4s ease; display: flex; flex-direction: column; gap: 12px; border-left: 5px solid #1a1a1a; max-width: 340px; min-width: 280px; box-sizing: border-box; }",
             ".vibe-toast.visible { transform: translateY(0) scale(1); opacity: 1; }",
             ".vibe-toast-header { display: flex; align-items: flex-start; gap: 12px; }",
             ".vibe-icon-wrapper { background: #f3f4f6; border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 16px; }",
@@ -79,16 +79,22 @@
             whatsapp: {
                 text: 'Consultar por WhatsApp',
                 className: 'vibe-btn vibe-btn--whatsapp',
-                action: function () {
+                action: function (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
                     sendVibeEvent('conversion_click', { elementId: 'whatsapp_button', meta: { action: 'user_accepted_help' } });
-                    // REEMPLAZAR EL NUMERO DE ABAJO
+                    // REEMPLAZAR EL NUMERO DE ABAJO EN PRODUCCIÓN
                     window.open('https://wa.me/5492645610946?text=Hola,%20tengo%20una%20duda%20con%20un%20producto%20de%20la%20tienda.', '_blank');
                 }
             },
             checkout: {
                 text: 'Ir al Carrito',
                 className: 'vibe-btn vibe-btn--checkout',
-                action: function () { window.location.href = '/cart'; }
+                action: function (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    window.location.href = '/cart';
+                }
             }
         };
 
@@ -167,7 +173,9 @@
     }
 
     function initSelectionTracker() {
-        document.addEventListener('mouseup', function () {
+        document.addEventListener('mouseup', function (e) {
+            if (e.target && e.target.closest('.vibe-toast')) return;
+
             const selection = window.getSelection();
             if (!selection || selection.rangeCount === 0) return;
             const text = selection.toString().trim();
