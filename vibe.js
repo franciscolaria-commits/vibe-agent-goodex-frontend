@@ -1,6 +1,7 @@
 /**
  * ═══════════════════════════════════════════════════════
  * VIBE AGENT SDK v1.0 (MVP) - TiendaNube Edition
+ * Optimistic UI + Mobile Touch Sensors + Fallback
  * ═══════════════════════════════════════════════════════
  */
 
@@ -26,7 +27,8 @@
         colors: {
             rage: "#ff4d4d",
             doubt: "#ffc107",
-            agent: "#212529"
+            agent: "#212529",
+            loading: "#6c757d"
         }
     };
 
@@ -47,6 +49,12 @@
     var SESSION_ID = sessionStorage.getItem('vibe_session_id');
 
     function sendVibeEvent(eventType, data) {
+        // --- OPTIMISTIC UI (Latencia Cero) ---
+        // Disparamos un mensaje de carga inmediato para matar la percepción de espera
+        if (eventType === 'hesitation' || eventType === 'compare_price') {
+            UI.speak("Consultando stock y promociones en tiempo real...", "loading", "none");
+        }
+
         const payload = {
             event_type: eventType,
             element_id: data.elementId || 'unknown',
@@ -67,11 +75,15 @@
             .then(function (response) { return response.json(); })
             .then(function (data) {
                 console.log("📥 Respuesta del Agente:", data);
+                // Sobrescribimos el mensaje de carga con la respuesta real de la IA
                 if (data.action === 'toast' && data.message) {
                     UI.speak(data.message, data.emotion || 'agent', data.button || 'none');
                 }
             })
-            .catch(function (err) { console.error('❌ Error de conexión:', err); });
+            .catch(function (err) {
+                console.error('❌ Error de conexión:', err);
+                UI.speak("Error de conexión con el Agente.", "rage", "none");
+            });
     }
 
     function initUI() {
@@ -83,30 +95,20 @@
         toast.className = 'vibe-toast';
         document.body.appendChild(toast);
 
-        const WHATSAPP_NUMBER = (window.VIBE_CONFIG && window.VIBE_CONFIG.whatsapp_number) || '5491155551234';
-        const WHATSAPP_MESSAGE = (window.VIBE_CONFIG && window.VIBE_CONFIG.whatsapp_message) || 'Hola, tengo una consulta sobre un producto';
-        const CHECKOUT_URL = (window.VIBE_CONFIG && window.VIBE_CONFIG.checkout_url) || '';
-
         const BUTTON_CONFIG = {
             whatsapp: {
                 text: 'Consultar por WhatsApp',
                 className: 'vibe-btn vibe-btn--whatsapp',
                 action: function () {
                     sendVibeEvent('conversion_click', { elementId: 'whatsapp_button', meta: { action: 'user_accepted_help' } });
-                    window.open('https://wa.me/' + WHATSAPP_NUMBER + '?text=' + encodeURIComponent(WHATSAPP_MESSAGE), '_blank');
+                    // REEMPLAZAR NÚMERO ACA ABAJO
+                    window.open('https://wa.me/5492645610946?text=Hola,%20tengo%20una%20duda%20con%20un%20producto%20de%20la%20tienda.', '_blank');
                 }
             },
             checkout: {
-                text: 'Ir a Pagar',
+                text: 'Ir al Carrito',
                 className: 'vibe-btn vibe-btn--checkout',
-                action: function () {
-                    if (CHECKOUT_URL) {
-                        window.location.href = CHECKOUT_URL;
-                    } else {
-                        // Si no hay checkout configurado, redirigir a WhatsApp
-                        window.open('https://wa.me/' + WHATSAPP_NUMBER + '?text=' + encodeURIComponent(WHATSAPP_MESSAGE), '_blank');
-                    }
-                }
+                action: function () { window.location.href = '/cart'; }
             }
         };
 
@@ -118,6 +120,7 @@
                 let agentEmoji = '🤖';
                 if (emotion === 'rage') agentEmoji = '🆘';
                 if (emotion === 'doubt') agentEmoji = '💡';
+                if (emotion === 'loading') agentEmoji = '⏳';
 
                 toast.innerHTML = '';
 
@@ -227,7 +230,7 @@
     }
 
     function initPriceSensors() {
-        let priceHoverTimer = null;
+        let priceTimer = null;
         const priceElements = document.querySelectorAll('#price_display, .js-price-display, .item-price, .price');
 
         if (priceElements.length === 0) {
@@ -236,23 +239,41 @@
         }
 
         priceElements.forEach(function (el) {
+            // --- SENSORES DESKTOP (PC) ---
             el.addEventListener('mouseenter', function () {
-                priceHoverTimer = setTimeout(function () {
-                    console.log("⏱️ Usuario analizando precio");
+                priceTimer = setTimeout(function () {
+                    console.log("⏱️ Desktop: Usuario analizando precio");
                     sendVibeEvent('compare_price', { elementId: 'price_hover', meta: { action: 'hover_2.5s' } });
                 }, 2500);
             });
 
             el.addEventListener('mouseleave', function () {
-                if (priceHoverTimer) clearTimeout(priceHoverTimer);
+                if (priceTimer) clearTimeout(priceTimer);
             });
 
+            // --- SENSORES MOBILE (Táctil) ---
+            el.addEventListener('touchstart', function () {
+                priceTimer = setTimeout(function () {
+                    console.log("📱 Mobile: Pulsación larga en precio");
+                    sendVibeEvent('compare_price', { elementId: 'price_touch', meta: { action: 'long_press_1.5s' } });
+                }, 1500);
+            }, { passive: true });
+
+            el.addEventListener('touchend', function () {
+                if (priceTimer) clearTimeout(priceTimer);
+            });
+
+            el.addEventListener('touchmove', function () {
+                if (priceTimer) clearTimeout(priceTimer);
+            }, { passive: true });
+
+            // --- UNIVERSAL ---
             el.addEventListener('click', function () {
-                console.log("👆 Click en precio detectado");
+                console.log("👆 Click/Tap en precio detectado");
                 sendVibeEvent('hesitation', { elementId: 'price_click', meta: { action: 'user_clicked_price' } });
             });
         });
-        console.log("🎯 Sensores directos de precio inyectados.");
+        console.log("🎯 Sensores Omnicanal inyectados.");
     }
 
     function adaptTiendaNubeDOM() {
