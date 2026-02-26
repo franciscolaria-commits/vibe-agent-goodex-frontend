@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HYPE KICKS | Air Phantom Neon</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        /* BASE DARK MODE */
+        :root {
+            --bg-color: #0a0a0c;
+            --surface: #141417;
+            --text-primary: #ffffff;
+            --text-secondary: #888891;
+            --accent: #ccff00;
+            /* Neón premium */
+            --border: #2a2a30;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            font-family: 'Inter', sans-serif;
+            line-height: 1.5;
+            padding-bottom: 100px;
+        }
+
+        /* NAVBAR HEADER */
+        header {
+            padding: 24px 40px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: rgba(10, 10, 12, 0.9);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .logo {
+            font-weight: 800;
+            font-size: 24px;
+            letter-spacing: -1px;
+        }
+
+        .logo span {
+            color: var(--accent);
+        }
+
+        /* PRODUCT LAYOUT */
+        .container {
+            max-width: 1200px;
+            margin: 40px auto;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 60px;
+            padding: 0 40px;
+        }
+
+        /* IMAGE SECTION */
+        .product-image-container {
+            background-color: var(--surface);
+            border-radius: 20px;
+            padding: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid var(--border);
+            height: 600px;
+        }
+
+        .product-image-container img {
+            width: 100%;
+            max-width: 500px;
+            transform: rotate(-15deg);
+            filter: drop-shadow(0 20px 30px rgba(0, 0, 0, 0.5));
+        }
+
+        /* DETAILS SECTION */
+        .product-details {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .badge {
+            background-color: var(--accent);
+            color: #000;
+            font-size: 12px;
+            font-weight: 800;
+            padding: 6px 12px;
+            border-radius: 4px;
+            text-transform: uppercase;
+            width: fit-content;
+            margin-bottom: 16px;
+        }
+
+        h1 {
+            font-size: 48px;
+            font-weight: 800;
+            line-height: 1.1;
+            margin-bottom: 16px;
+            letter-spacing: -1px;
+        }
+
+        /* PRECIO - SENSOR TEXT SELECTION */
+        .price {
+            font-size: 32px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 32px;
+            width: fit-content;
+        }
+
+        .description {
+            color: var(--text-secondary);
+            margin-bottom: 40px;
+            font-size: 16px;
+        }
+
+        /* OPTIONS - SENSOR PING-PONG */
+        .section-title {
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-secondary);
+            margin-bottom: 12px;
+            font-weight: 600;
+        }
+
+        .options-grid {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 32px;
+            flex-wrap: wrap;
+        }
+
+        .option-btn {
+            background-color: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            padding: 14px 24px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .option-btn:hover {
+            border-color: var(--text-secondary);
+        }
+
+        .option-btn.active {
+            border-color: var(--accent);
+            color: var(--accent);
+            background-color: rgba(204, 255, 0, 0.05);
+        }
+
+        /* ADD TO CART - SENSOR RAGE CLICK */
+        .btn-primary {
+            background-color: var(--text-primary);
+            color: var(--bg-color);
+            border: none;
+            padding: 20px;
+            border-radius: 8px;
+            font-size: 18px;
+            font-weight: 800;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: transform 0.1s ease;
+            margin-top: 10px;
+        }
+
+        .btn-primary:active {
+            transform: scale(0.98);
+        }
+    </style>
+</head>
+
+<body>
+
+    <header>
+        <div class="logo">HYPE<span>KICKS</span></div>
+        <div style="color: var(--text-secondary); font-weight: 600;">CART (0)</div>
+    </header>
+
+    <main class="container" data-vibe="track" data-vibe-id="sneaker-air-phantom">
+
+        <div class="product-image-container">
+            <img src="https://images.unsplash.com/photo-1608231387042-66d1773070a5?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80"
+                alt="Air Phantom Neon">
+        </div>
+
+        <div class="product-details">
+            <div class="badge">Exclusive Drop</div>
+            <h1>Air Phantom "Dark Neon"</h1>
+
+            <div class="price" id="price-tag">$ 240.000</div>
+
+            <p class="description">Diseñadas para la jungla de asfalto. Malla balística transpirable, detalles
+                reflectantes 3M y cápsula de aire completa para máxima absorción de impacto.</p>
+
+            <div class="section-title">Seleccionar Color</div>
+            <div class="options-grid" id="color-options">
+                <button class="option-btn active" data-vibe="option" data-value="color-neon">Dark Neon</button>
+                <button class="option-btn" data-vibe="option" data-value="color-tripleblack">Triple Black</button>
+                <button class="option-btn" data-vibe="option" data-value="color-wolfgrey">Wolf Grey</button>
+            </div>
+
+            <div class="section-title">Seleccionar Talle (AR)</div>
+            <div class="options-grid" id="size-options">
+                <button class="option-btn" data-vibe="option" data-value="size-40">40</button>
+                <button class="option-btn" data-vibe="option" data-value="size-41">41</button>
+                <button class="option-btn" data-vibe="option" data-value="size-42">42</button>
+                <button class="option-btn" data-vibe="option" data-value="size-43">43</button>
+                <button class="option-btn" data-vibe="option" data-value="size-44">44</button>
+            </div>
+
+            <button class="btn-primary" id="btn-add-cart">Agregar al carrito</button>
+
+        </div>
+    </main>
+
+    <script>
+        function setupToggle(groupId) {
+            const container = document.getElementById(groupId);
+            const buttons = container.querySelectorAll('.option-btn');
+            buttons.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    buttons.forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                });
+            });
+        }
+        setupToggle('color-options');
+        setupToggle('size-options');
+    </script>
+
+    <script src="vibe.js"></script>
+
+</body>
+
+</html>

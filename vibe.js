@@ -1,7 +1,7 @@
 /**
  * ═══════════════════════════════════════════════════════
  * VIBE AGENT SDK v1.0 (MVP) - TiendaNube Edition
- * Incluye: Visibility, Price Comparison, Adaptador DOM, Conversion Tracking
+ * Incluye: Visibility, Price Comparison, Adaptador DOM, Fallback Sensors
  * ═══════════════════════════════════════════════════════
  */
 
@@ -10,51 +10,43 @@
     // 1. CONFIGURACIÓN & ESTADO
     // ────────────────────────────────────────────────────────
 
-    // API endpoint configurable de 3 formas (en orden de prioridad):
-    // 1. window.VIBE_CONFIG = { api_endpoint: 'https://tu-api.com/api/track' }  (antes de cargar el script)
-    // 2. <script src="vibe.js" data-api="https://tu-api.com/api/track">  (atributo en el script tag)
-    // 3. Default: http://localhost:8000/api/track (desarrollo local)
     function _resolveApiEndpoint() {
-        // Prioridad 1: variable global
         if (window.VIBE_CONFIG && window.VIBE_CONFIG.api_endpoint) {
             return window.VIBE_CONFIG.api_endpoint;
         }
-        // Prioridad 2: data-api attribute en el script tag
         var scripts = document.querySelectorAll('script[src*="vibe.js"]');
         for (var i = 0; i < scripts.length; i++) {
             var apiAttr = scripts[i].getAttribute('data-api');
             if (apiAttr) return apiAttr;
         }
-        // Default: desarrollo local
         return 'http://localhost:8000/api/track';
     }
 
     const CONFIG = {
         api_endpoint: _resolveApiEndpoint(),
         thresholds: {
-            visibility: 0.5,      // 50% visible
-            time_visible: 2000,   // 2 segundos
-            rage_clicks: 3,       // 3 clicks rápidos
-            rage_time: 800,       // en menos de 800ms
-            doubt_pingpong: 4,    // 4 cambios de opción
-            doubt_time: 10000     // en 10 segundos
+            visibility: 0.5,
+            time_visible: 2000,
+            rage_clicks: 3,
+            rage_time: 800,
+            doubt_pingpong: 4,
+            doubt_time: 10000
         },
         colors: {
-            rage: "#ff4d4d",   // Rojo
-            doubt: "#ffc107",  // Amarillo
-            agent: "#212529"   // Negro
+            rage: "#ff4d4d",
+            doubt: "#ffc107",
+            agent: "#212529"
         }
     };
 
     console.log('🔗 Vibe API endpoint:', CONFIG.api_endpoint);
 
-    // Estado interno (Memoria a corto plazo)
     let history = {
         clicks: [],
         options: []
     };
 
-    // ── SESSION ID (identifica al usuario durante la sesión) ──
+    // ── SESSION ID ──
     function generateSessionId() {
         var chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
         var id = '';
@@ -84,7 +76,6 @@
             session_id: SESSION_ID
         };
 
-        // Header ngrok-skip-browser-warning incluido para evitar bloqueos
         fetch(CONFIG.api_endpoint, {
             method: 'POST',
             headers: {
@@ -170,13 +161,11 @@
                 className: 'vibe-btn vibe-btn--whatsapp',
                 icon: ICONS.whatsapp,
                 action: function () {
-                    // 1. Enviamos el evento de conversión al backend
                     sendVibeEvent('conversion_click', {
                         elementId: 'whatsapp_button',
                         meta: { action: 'user_accepted_help' }
                     });
-
-                    // 2. Redirigimos a WhatsApp (ATENCIÓN: CAMBIAR NÚMERO)
+                    // ATENCIÓN: CAMBIAR ESTE NÚMERO
                     window.open('https://wa.me/549XXXXXXXXX?text=Hola,%20tengo%20una%20duda%20con%20un%20producto', '_blank');
                 }
             },
@@ -199,7 +188,6 @@
                 if (emotion === 'rage') agentEmoji = '🆘';
                 if (emotion === 'doubt') agentEmoji = '💡';
 
-                // Construir DOM de forma segura (previene XSS desde respuestas del LLM)
                 toast.innerHTML = '';
 
                 var header = document.createElement('div');
@@ -212,7 +200,7 @@
 
                 var msgDiv = document.createElement('div');
                 msgDiv.className = 'vibe-message';
-                msgDiv.textContent = message;  // textContent = seguro contra XSS
+                msgDiv.textContent = message;
                 header.appendChild(msgDiv);
 
                 toast.appendChild(header);
@@ -299,13 +287,14 @@
 
             let curr = node;
             while (curr && curr !== document.body) {
-                if (curr.id) { context = `#${curr.id}`; elId = curr.id; break; }
+                if (curr.id) { context = '#' + curr.id; elId = curr.id; break; }
                 if (curr.className) {
-                    context = \`.\${curr.className.split(' ')[0]}\`; break; }
+                    context = '.' + curr.className.split(' ')[0]; break;
+                }
                 curr = curr.parentElement;
             }
 
-            console.log(`✂️ Selección: "${text}" en ${ context } `);
+            console.log(`✂️ Selección: "${text}" en ${context}`);
             sendVibeEvent('compare_price', {
                 elementId: elId,
                 meta: { text_selected: text, context_selector: context }
@@ -313,33 +302,66 @@
         });
     }
 
-    // initBehaviorTracker eliminado del flujo de inicialización por generar falsos positivos en TiendaNube.
+    // --- NUEVO: SENSORES DE PRECIO (Fallback para Goodex) ---
+    function initPriceSensors() {
+        let priceHoverTimer = null;
+        const priceElements = document.querySelectorAll('#price_display, .js-price-display, .item-price, .price');
+
+        if (priceElements.length === 0) {
+            console.log("⚠️ No se encontraron elementos de precio para los sensores directos.");
+            return;
+        }
+
+        priceElements.forEach(el => {
+            // Hover: 2.5 segundos sobre el precio sin hacer clic
+            el.addEventListener('mouseenter', () => {
+                priceHoverTimer = setTimeout(() => {
+                    console.log("⏱️ Usuario analizando precio (Hover prolongado)");
+                    sendVibeEvent('compare_price', {
+                        elementId: 'price_hover',
+                        meta: { action: 'hover_2.5s' }
+                    });
+                }, 2500);
+            });
+
+            el.addEventListener('mouseleave', () => {
+                if (priceHoverTimer) clearTimeout(priceHoverTimer);
+            });
+
+            // Click: El usuario hace clic sobre el texto del precio (intenta copiarlo o seleccionarlo)
+            el.addEventListener('click', () => {
+                console.log("👆 Click en precio detectado");
+                sendVibeEvent('hesitation', {
+                    elementId: 'price_click',
+                    meta: { action: 'user_clicked_price' }
+                });
+            });
+        });
+        console.log("🎯 Sensores directos de precio inyectados.");
+    }
 
     // ────────────────────────────────────────────────────────
     // 5. INICIALIZACIÓN MAESTRA
     // ────────────────────────────────────────────────────────
 
     function adaptTiendaNubeDOM() {
-        // Busca el título del producto
         const productNameEl = document.querySelector('h1') || document.querySelector('[data-store="product-name"]');
         const productName = productNameEl ? productNameEl.innerText.trim() : 'Producto Desconocido';
 
-        // Busca el contenedor principal del producto para el foco visual
         const productContainer = document.querySelector('.js-product-container') || document.querySelector('#single-product') || document.body;
-        
-        // Inyecta los sensores dinámicamente
+
         productContainer.setAttribute('data-vibe', 'track');
         productContainer.setAttribute('data-vibe-id', productName);
-        
+
         console.log("🛠️ Adaptador TiendaNube: Sensores inyectados para ->", productName);
     }
 
     function init() {
         console.log("🚀 Vibe Agent v1.0: Cargado y Observando.");
-        adaptTiendaNubeDOM(); 
+        adaptTiendaNubeDOM();
+        initPriceSensors(); // Inyección de sensores de Goodex
         initVisibilityTracker();
         initSelectionTracker();
-        // initBehaviorTracker() desactivado.
     }
 
     if (document.readyState === 'loading') {
