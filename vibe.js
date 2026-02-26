@@ -25,6 +25,7 @@
     var SESSION_ID = sessionStorage.getItem('vibe_session_id');
 
     function sendVibeEvent(eventType, data) {
+        // El Toast optimista solo se dispara para hesitation o compare_price
         if (eventType === 'hesitation' || eventType === 'compare_price') {
             UI.speak("Consultando stock y promociones en tiempo real...", "loading", "none");
         }
@@ -178,7 +179,6 @@
     function initSelectionTracker(container) {
         let selectionDebounceTimer = null;
 
-        // Escuchar selectionchange aislado solo al documento, pero filtrando por contenedor
         document.addEventListener('selectionchange', function () {
             if (selectionDebounceTimer) clearTimeout(selectionDebounceTimer);
 
@@ -193,10 +193,7 @@
                 if (!node) return;
                 if (node.nodeType === Node.TEXT_NODE) node = node.parentElement;
 
-                // Filtro 1: Evitar disparos dentro del propio Toast
                 if (node.closest && node.closest('.vibe-toast')) return;
-
-                // Filtro 2 (Aislamiento de Memoria): Solo procesar si la selección ocurrió dentro del contenedor del producto
                 if (!container.contains(node)) return;
 
                 let context = 'unknown';
@@ -211,7 +208,7 @@
 
                 console.log("✂️ Selección de texto detectada: ", text, " en ", context);
                 sendVibeEvent('compare_price', { elementId: elId, meta: { text_selected: text, context_selector: context } });
-            }, 800); // Debounce de 800ms para móvil
+            }, 800);
         });
     }
 
@@ -227,14 +224,16 @@
             el.addEventListener('change', function (e) {
                 const selectedValue = e.target.value || e.target.innerText || 'desconocido';
                 console.log("👕 Variante seleccionada: ", selectedValue);
-                sendVibeEvent('hesitation', { elementId: 'size_selector', meta: { selected_size: selectedValue } });
+                // CORRECCIÓN: Evento cambiado a 'size_select' para evitar el Toast
+                sendVibeEvent('size_select', { elementId: 'size_selector', meta: { selected_size: selectedValue } });
             });
 
             if (el.tagName.toLowerCase() !== 'select' && el.tagName.toLowerCase() !== 'input') {
                 el.addEventListener('click', function (e) {
                     const selectedValue = e.target.innerText.trim();
                     console.log("👕 Variante clickeada: ", selectedValue);
-                    sendVibeEvent('hesitation', { elementId: 'size_button', meta: { selected_size: selectedValue } });
+                    // CORRECCIÓN: Evento cambiado a 'size_select' para evitar el Toast
+                    sendVibeEvent('size_select', { elementId: 'size_button', meta: { selected_size: selectedValue } });
                 });
             }
         });
@@ -286,7 +285,7 @@
         productContainer.setAttribute('data-vibe', 'track');
         productContainer.setAttribute('data-vibe-id', productName);
 
-        return productContainer; // Retornamos el contenedor para aislar el tracker de selección
+        return productContainer;
     }
 
     function init() {
@@ -296,7 +295,7 @@
         initPriceSensors();
         initSizeSensors();
         initVisibilityTracker();
-        initSelectionTracker(mainContainer); // Pasamos el contenedor para aislar eventos
+        initSelectionTracker(mainContainer);
     }
 
     if (document.readyState === 'loading') {
