@@ -83,19 +83,30 @@
         toast.className = 'vibe-toast';
         document.body.appendChild(toast);
 
+        const WHATSAPP_NUMBER = (window.VIBE_CONFIG && window.VIBE_CONFIG.whatsapp_number) || '5491155551234';
+        const WHATSAPP_MESSAGE = (window.VIBE_CONFIG && window.VIBE_CONFIG.whatsapp_message) || 'Hola, tengo una consulta sobre un producto';
+        const CHECKOUT_URL = (window.VIBE_CONFIG && window.VIBE_CONFIG.checkout_url) || '';
+
         const BUTTON_CONFIG = {
             whatsapp: {
                 text: 'Consultar por WhatsApp',
                 className: 'vibe-btn vibe-btn--whatsapp',
                 action: function () {
                     sendVibeEvent('conversion_click', { elementId: 'whatsapp_button', meta: { action: 'user_accepted_help' } });
-                    window.open('https://wa.me/549XXXXXXXXX?text=Hola', '_blank');
+                    window.open('https://wa.me/' + WHATSAPP_NUMBER + '?text=' + encodeURIComponent(WHATSAPP_MESSAGE), '_blank');
                 }
             },
             checkout: {
                 text: 'Ir a Pagar',
                 className: 'vibe-btn vibe-btn--checkout',
-                action: function () { window.location.href = '/checkout'; }
+                action: function () {
+                    if (CHECKOUT_URL) {
+                        window.location.href = CHECKOUT_URL;
+                    } else {
+                        // Si no hay checkout configurado, redirigir a WhatsApp
+                        window.open('https://wa.me/' + WHATSAPP_NUMBER + '?text=' + encodeURIComponent(WHATSAPP_MESSAGE), '_blank');
+                    }
+                }
             }
         };
 
