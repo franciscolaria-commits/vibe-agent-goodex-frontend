@@ -1,6 +1,6 @@
 /**
  * VIBE AGENT SDK v1.0 (MVP) - TiendaNube Edition
- * Optimistic UI + Mobile Touch Sensors + Fallback + Event Isolation
+ * Optimistic UI + Mobile Touch Sensors + Fallback + Event Isolation + Memory Optimized
  */
 (function () {
     function _resolveApiEndpoint() {
@@ -45,6 +45,7 @@
         })
             .then(function (res) { return res.json(); })
             .then(function (data) {
+                console.log("📥 Respuesta del Agente:", data);
                 if (data.action === 'toast' && data.message) {
                     UI.speak(data.message, data.emotion || 'agent', data.button || 'none');
                 }
@@ -82,8 +83,8 @@
                 action: function (e) {
                     e.preventDefault();
                     e.stopPropagation();
+                    console.log("🚀 Conversión: Clic en WhatsApp");
                     sendVibeEvent('conversion_click', { elementId: 'whatsapp_button', meta: { action: 'user_accepted_help' } });
-                    // REEMPLAZAR EL NUMERO DE ABAJO EN PRODUCCIÓN
                     window.open('https://wa.me/5492645610946?text=Hola,%20tengo%20una%20duda%20con%20un%20producto%20de%20la%20tienda.', '_blank');
                 }
             },
@@ -93,6 +94,7 @@
                 action: function (e) {
                     e.preventDefault();
                     e.stopPropagation();
+                    console.log("🛒 Conversión: Clic en Ir al Carrito");
                     window.location.href = '/cart';
                 }
             }
@@ -156,6 +158,7 @@
                     if (elementTimers.has(element)) clearTimeout(elementTimers.get(element));
                     const timerId = setTimeout(function () {
                         const timeVisible = Date.now() - observedAt.get(element);
+                        console.log("👁️ Interés visual detectado en:", elementId);
                         sendVibeEvent('interest', { elementId: elementId, meta: { time_visible: timeVisible, type: 'visual_focus' } });
                         observer.unobserve(element);
                         elementTimers.delete(element);
@@ -172,36 +175,84 @@
         document.querySelectorAll('[data-vibe="track"]').forEach(function (el) { observer.observe(el); });
     }
 
-    function initSelectionTracker() {
-        document.addEventListener('mouseup', function (e) {
-            if (e.target && e.target.closest('.vibe-toast')) return;
+    function initSelectionTracker(container) {
+        let selectionDebounceTimer = null;
 
-            const selection = window.getSelection();
-            if (!selection || selection.rangeCount === 0) return;
-            const text = selection.toString().trim();
-            if (text.length <= 3) return;
-            let node = selection.anchorNode;
-            let context = 'unknown';
-            let elId = 'unknown';
-            if (node.nodeType === Node.TEXT_NODE) node = node.parentElement;
-            let curr = node;
-            while (curr && curr !== document.body) {
-                if (curr.id) { context = '#' + curr.id; elId = curr.id; break; }
-                if (curr.className) { context = '.' + curr.className.split(' ')[0]; break; }
-                curr = curr.parentElement;
+        // Escuchar selectionchange aislado solo al documento, pero filtrando por contenedor
+        document.addEventListener('selectionchange', function () {
+            if (selectionDebounceTimer) clearTimeout(selectionDebounceTimer);
+
+            selectionDebounceTimer = setTimeout(function () {
+                const selection = window.getSelection();
+                if (!selection || selection.rangeCount === 0) return;
+
+                const text = selection.toString().trim();
+                if (text.length <= 3) return;
+
+                let node = selection.anchorNode;
+                if (!node) return;
+                if (node.nodeType === Node.TEXT_NODE) node = node.parentElement;
+
+                // Filtro 1: Evitar disparos dentro del propio Toast
+                if (node.closest && node.closest('.vibe-toast')) return;
+
+                // Filtro 2 (Aislamiento de Memoria): Solo procesar si la selección ocurrió dentro del contenedor del producto
+                if (!container.contains(node)) return;
+
+                let context = 'unknown';
+                let elId = 'unknown';
+                let curr = node;
+
+                while (curr && curr !== document.body) {
+                    if (curr.id) { context = '#' + curr.id; elId = curr.id; break; }
+                    if (curr.className) { context = '.' + curr.className.split(' ')[0]; break; }
+                    curr = curr.parentElement;
+                }
+
+                console.log("✂️ Selección de texto detectada: ", text, " en ", context);
+                sendVibeEvent('compare_price', { elementId: elId, meta: { text_selected: text, context_selector: context } });
+            }, 800); // Debounce de 800ms para móvil
+        });
+    }
+
+    function initSizeSensors() {
+        const variantSelectors = document.querySelectorAll('.js-product-variants select, .js-variant-select, input[type="radio"][data-variant], .js-product-variants .btn-variant');
+
+        if (variantSelectors.length === 0) {
+            console.log("⚠️ Vibe Agent: No se encontraron selectores de talles/variantes estándar.");
+            return;
+        }
+
+        variantSelectors.forEach(function (el) {
+            el.addEventListener('change', function (e) {
+                const selectedValue = e.target.value || e.target.innerText || 'desconocido';
+                console.log("👕 Variante seleccionada: ", selectedValue);
+                sendVibeEvent('hesitation', { elementId: 'size_selector', meta: { selected_size: selectedValue } });
+            });
+
+            if (el.tagName.toLowerCase() !== 'select' && el.tagName.toLowerCase() !== 'input') {
+                el.addEventListener('click', function (e) {
+                    const selectedValue = e.target.innerText.trim();
+                    console.log("👕 Variante clickeada: ", selectedValue);
+                    sendVibeEvent('hesitation', { elementId: 'size_button', meta: { selected_size: selectedValue } });
+                });
             }
-            sendVibeEvent('compare_price', { elementId: elId, meta: { text_selected: text, context_selector: context } });
         });
     }
 
     function initPriceSensors() {
         let priceTimer = null;
         const priceElements = document.querySelectorAll('#price_display, .js-price-display, .item-price, .price');
-        if (priceElements.length === 0) return;
+
+        if (priceElements.length === 0) {
+            console.log("⚠️ Vibe Agent: No se encontraron elementos de precio.");
+            return;
+        }
 
         priceElements.forEach(function (el) {
             el.addEventListener('mouseenter', function () {
                 priceTimer = setTimeout(function () {
+                    console.log("⏱️ Usuario analizando precio (Hover)");
                     sendVibeEvent('compare_price', { elementId: 'price_hover', meta: { action: 'hover_2.5s' } });
                 }, 2500);
             });
@@ -210,6 +261,7 @@
             });
             el.addEventListener('touchstart', function () {
                 priceTimer = setTimeout(function () {
+                    console.log("📱 Usuario manteniendo dedo en precio (Touch)");
                     sendVibeEvent('compare_price', { elementId: 'price_touch', meta: { action: 'long_press_1.5s' } });
                 }, 1500);
             }, { passive: true });
@@ -220,6 +272,7 @@
                 if (priceTimer) clearTimeout(priceTimer);
             }, { passive: true });
             el.addEventListener('click', function () {
+                console.log("👆 Clic detectado en el precio");
                 sendVibeEvent('hesitation', { elementId: 'price_click', meta: { action: 'user_clicked_price' } });
             });
         });
@@ -229,18 +282,26 @@
         const productNameEl = document.querySelector('h1') || document.querySelector('[data-store="product-name"]');
         const productName = productNameEl ? productNameEl.innerText.trim() : 'Producto Desconocido';
         const productContainer = document.querySelector('.js-product-container') || document.querySelector('#single-product') || document.body;
+
         productContainer.setAttribute('data-vibe', 'track');
         productContainer.setAttribute('data-vibe-id', productName);
+
+        return productContainer; // Retornamos el contenedor para aislar el tracker de selección
     }
 
     function init() {
         console.log("🚀 Vibe Agent v1.0: Cargado y Observando.");
-        adaptTiendaNubeDOM();
+        const mainContainer = adaptTiendaNubeDOM();
+
         initPriceSensors();
+        initSizeSensors();
         initVisibilityTracker();
-        initSelectionTracker();
+        initSelectionTracker(mainContainer); // Pasamos el contenedor para aislar eventos
     }
 
-    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
-    else init();
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
+    }
 })();
