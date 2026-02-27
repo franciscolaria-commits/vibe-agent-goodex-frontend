@@ -252,8 +252,8 @@
             el.addEventListener('mouseenter', function () {
                 priceTimer = setTimeout(function () {
                     console.log("⏱️ Usuario analizando precio (Hover)");
-                    sendVibeEvent('compare_price', { elementId: 'price_hover', meta: { action: 'hover_2.5s' } });
-                }, 2500);
+                    sendVibeEvent('compare_price', { elementId: 'price_hover', meta: { action: 'hover_15s' } });
+                }, 15000);
             });
             el.addEventListener('mouseleave', function () {
                 if (priceTimer) clearTimeout(priceTimer);
@@ -261,8 +261,8 @@
             el.addEventListener('touchstart', function () {
                 priceTimer = setTimeout(function () {
                     console.log("📱 Usuario manteniendo dedo en precio (Touch)");
-                    sendVibeEvent('compare_price', { elementId: 'price_touch', meta: { action: 'long_press_1.5s' } });
-                }, 1500);
+                    sendVibeEvent('compare_price', { elementId: 'price_touch', meta: { action: 'long_press_15s' } });
+                }, 15000);
             }, { passive: true });
             el.addEventListener('touchend', function () {
                 if (priceTimer) clearTimeout(priceTimer);
@@ -294,7 +294,7 @@
 
         initPriceSensors();
         initSizeSensors();
-        initVisibilityTracker();
+        // initVisibilityTracker(); // Removemos el sensor de scroleo a pedido del cliente
         initSelectionTracker(mainContainer);
     }
 
