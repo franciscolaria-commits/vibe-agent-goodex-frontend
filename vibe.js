@@ -160,7 +160,7 @@
                     const timerId = setTimeout(function () {
                         const timeVisible = Date.now() - observedAt.get(element);
                         console.log("👁️ Interés visual detectado en:", elementId);
-                        sendVibeEvent('interest', { elementId: elementId, meta: { time_visible: timeVisible, type: 'visual_focus' } });
+                        // sendVibeEvent('interest', { elementId: elementId, meta: { time_visible: timeVisible, type: 'visual_focus' } });
                         observer.unobserve(element);
                         elementTimers.delete(element);
                     }, CONFIG.thresholds.time_visible);
