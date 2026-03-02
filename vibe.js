@@ -277,24 +277,67 @@
         });
     }
 
-    function adaptTiendaNubeDOM() {
-        const productNameEl = document.querySelector('h1') || document.querySelector('[data-store="product-name"]');
-        const productName = productNameEl ? productNameEl.innerText.trim() : 'Producto Desconocido';
-        const productContainer = document.querySelector('.js-product-container') || document.querySelector('#single-product') || document.body;
+    function adaptStoreDOM() {
+        // 1. Cascada de selectores de Título (TiendaNube + Themes de Shopify)
+        const nameSelectors = [
+            '[data-store="product-name"]',           // TiendaNube nativo
+            '.product__title h1',                    // Shopify (Dawn Theme)
+            '.product__title',                       // Shopify (Dawn variante)
+            '.product-single__title',                // Shopify (Vintage Themes)
+            '.product-title',                        // Shopify genérico
+            'h1.product-title',                      // Shopify genérico
+            '.product-info h1',                      // Shopify (bloques de info)
+            '.product-details h1'                    // E-commerce genérico
+        ];
 
+        let productNameEl = null;
+        for (const selector of nameSelectors) {
+            productNameEl = document.querySelector(selector);
+            if (productNameEl) break;
+        }
+
+        // 2. Fallback de seguridad: Buscar un H1 que NO esté en el Header (Evita capturar el Logo)
+        if (!productNameEl) {
+            const h1s = Array.from(document.querySelectorAll('h1'));
+            productNameEl = h1s.find(h1 => !h1.closest('header') && !h1.closest('.site-header'));
+        }
+
+        const productName = productNameEl ? productNameEl.innerText.trim() : 'Producto Desconocido';
+
+        // 3. Cascada de selectores de Contenedor (Aislar eventos de tracking)
+        const containerSelectors = [
+            '.js-product-container',                 // TiendaNube
+            '#single-product',                       // TiendaNube
+            '.product-section',                      // Shopify
+            '.product-single',                       // Shopify
+            '.product__info-wrapper',                // Shopify (Dawn)
+            'main[role="main"]',                     // Estándar accesible
+            'main'                                   // Fallback global
+        ];
+
+        let productContainer = null;
+        for (const selector of containerSelectors) {
+            productContainer = document.querySelector(selector);
+            if (productContainer) break;
+        }
+
+        if (!productContainer) productContainer = document.body;
+
+        // 4. Inyección de atributos Vibe
         productContainer.setAttribute('data-vibe', 'track');
         productContainer.setAttribute('data-vibe-id', productName);
 
+        console.log(`🏷️ Vibe Agent: Producto detectado -> "${productName}"`);
+
         return productContainer;
     }
-
     function init() {
-        console.log("🚀 Vibe Agent v1.0: Cargado y Observando.");
-        const mainContainer = adaptTiendaNubeDOM();
+        console.log("🚀 Vibe Agent v1.1: Cargado y Observando (Multi-CMS).");
+        const mainContainer = adaptStoreDOM();
 
         initPriceSensors();
         initSizeSensors();
-        // initVisibilityTracker(); // Removemos el sensor de scroleo a pedido del cliente
+        // initVisibilityTracker(); // Desactivado por límite de tokens/fricción
         initSelectionTracker(mainContainer);
     }
 
