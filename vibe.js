@@ -221,30 +221,28 @@
     }
 
     function initSizeSensors() {
-        const variantSelectors = document.querySelectorAll(`
-            /* TiendaNube */
-            .js-product-variants select, 
-            .js-variant-select, 
-            .js-product-variants .btn-variant,
-            /* Shopify Standard & Dawn */
-            fieldset input[type="radio"],
-            .variant-input input[type="radio"],
-            .swatch input[type="radio"],
-            .product-form__input input[type="radio"],
-            .product-variant-options input[type="radio"],
-            /* Fallbacks ultragenéricos de formularios de producto */
-            .product-form form input[type="radio"],
-            .product__info-container input[type="radio"],
-            .variant-wrapper input[type="radio"],
-            form[action*="/cart/add"] input[type="radio"],
-            /* Cualquier radio button que contenga datos de variante */
-            input[type="radio"][data-variant],
-            input[type="radio"][name*="id"],
-            input[type="radio"][name*="option"]
-        `);
+        // Unimos los selectores en un único string separado por comas para usar con matches()
+        const variantSelectors = [
+            '.js-product-variants select',
+            '.js-variant-select',
+            '.js-product-variants .btn-variant',
+            'fieldset input[type="radio"]',
+            '.variant-input input[type="radio"]',
+            '.swatch input[type="radio"]',
+            '.product-form__input input[type="radio"]',
+            '.product-variant-options input[type="radio"]',
+            '.product-form form input[type="radio"]',
+            '.product__info-container input[type="radio"]',
+            '.variant-wrapper input[type="radio"]',
+            'form[action*="/cart/add"] input[type="radio"]',
+            'input[type="radio"][data-variant]',
+            'input[type="radio"][name*="id"]',
+            'input[type="radio"][name*="option"]'
+        ].join(', ');
 
-        if (variantSelectors.length === 0) {
-            console.log("⚠️ Vibe Agent: No se encontraron selectores de talles/variantes estándar.");
+        const productForms = document.querySelectorAll('form[action*="/cart/add"], .js-product-container, [data-vibe="track"]');
+        if (productForms.length === 0) {
+            console.log("⚠️ Vibe Agent: No se encontró área de producto, sensores de talla inactivos.");
             return;
         }
 
@@ -253,13 +251,15 @@
 
         function handleSizeSelection(selectedValue, sourceId) {
             if (!selectedValue || selectedValue === 'desconocido') return;
+            selectedValue = selectedValue.trim();
 
             // Si el cliente no ha seleccionado este talle antes, lo agregamos a la memoria
             if (!selectedSizes.includes(selectedValue)) {
                 selectedSizes.push(selectedValue);
+                console.log("👕 Variante registrada: ", selectedValue, "- Memoria temporal: ", selectedSizes);
+            } else {
+                console.log("👕 Variante ya estaba en memoria: ", selectedValue);
             }
-
-            console.log("👕 Variante seleccionada: ", selectedValue, "- Memoria de talles: ", selectedSizes);
 
             // Si ha navegado por al menos 2 talles distintos, disparamos el evento de duda
             if (selectedSizes.length >= 2) {
@@ -277,28 +277,46 @@
             }
         }
 
-        variantSelectors.forEach(function (el) {
-            el.addEventListener('change', function (e) {
-                let selectedValue = e.target.value;
+        // Usamos Delegación de Eventos en el BODY. 
+        // Esto sobrevive a Shopify cuando destruye y vuelve a crear los botones de talle vía AJAX.
+        document.body.addEventListener('change', function (e) {
+            const target = e.target;
+            if (target.matches && target.matches(variantSelectors)) {
+                let selectedValue = target.value;
 
-                // Si el valor es de un radio button de Shopify, a veces el label tiene el texto real o el value es algo genérico
-                if (e.target.type === 'radio' || e.target.tagName.toLowerCase() === 'input') {
-                    // Intenta sacar el valor del label asociado si existe
-                    const label = document.querySelector('label[for="' + e.target.id + '"]');
+                if (target.type === 'radio' || target.tagName.toLowerCase() === 'input') {
+                    const label = document.querySelector('label[for="' + target.id + '"]');
                     if (label) {
-                        selectedValue = label.innerText.trim();
+                        selectedValue = label.innerText;
                     }
                 }
+                selectedValue = selectedValue || target.innerText;
+                handleSizeSelection(selectedValue, 'size_selector_change');
+            }
+        });
 
-                selectedValue = selectedValue || e.target.innerText;
-                handleSizeSelection(selectedValue, 'size_selector');
-            });
+        document.body.addEventListener('click', function (e) {
+            const target = e.target;
 
-            if (el.tagName.toLowerCase() !== 'select' && el.tagName.toLowerCase() !== 'input') {
-                el.addEventListener('click', function (e) {
-                    const selectedValue = e.target.innerText.trim();
-                    handleSizeSelection(selectedValue, 'size_button');
-                });
+            // Shopify a veces dispara el click en el LABEL en lugar del INPUT
+            const isLabelForVariant = target.tagName.toLowerCase() === 'label' && target.getAttribute('for');
+            let matchedTarget = target;
+
+            if (isLabelForVariant) {
+                const inputId = target.getAttribute('for');
+                matchedTarget = document.getElementById(inputId);
+                if (!matchedTarget) return;
+            }
+
+            if (matchedTarget.matches && matchedTarget.matches(variantSelectors)) {
+                // Si no es un select ni un input, tomamos el innerText del click original
+                if (matchedTarget.tagName.toLowerCase() !== 'select' && matchedTarget.tagName.toLowerCase() !== 'input') {
+                    const selectedValue = target.innerText;
+                    handleSizeSelection(selectedValue, 'size_button_click');
+                } else if (isLabelForVariant) {
+                    // Si clicaron un label asociado a input, enviamos el texto de ese label
+                    handleSizeSelection(target.innerText, 'size_label_click');
+                }
             }
         });
     }
