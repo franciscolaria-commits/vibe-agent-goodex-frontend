@@ -8,9 +8,15 @@
         return 'http://localhost:8000/api/track';
     }
 
+    function _resolveWhatsAppNumber() {
+        if (window.VIBE_CONFIG && window.VIBE_CONFIG.whatsapp_number) return window.VIBE_CONFIG.whatsapp_number;
+        return '5492645610946'; // Fallback por defecto
+    }
+
     const CONFIG = {
         api_endpoint: _resolveApiEndpoint(),
-        thresholds: { visibility: 0.5, time_visible: 2000 },
+        whatsapp_number: _resolveWhatsAppNumber(),
+        thresholds: { visibility: 0.5, time_visible: 15000 },
         colors: { rage: "#ff4d4d", doubt: "#ffc107", agent: "#212529", loading: "#6c757d" }
     };
 
@@ -48,12 +54,14 @@
             .then(function (data) {
                 console.log("📥 Respuesta del Agente:", data);
                 if (data.action === 'toast' && data.message) {
-                    UI.speak(data.message, data.emotion || 'agent', data.button || 'none');
+                    // Fuerza a mostrar siempre un botón. Si el backend no envía uno, usa 'whatsapp' por defecto
+                    const buttonToUse = (data.button && data.button !== 'none') ? data.button : 'whatsapp';
+                    UI.speak(data.message, data.emotion || 'agent', buttonToUse);
                 }
             })
             .catch(function (err) {
                 console.error('❌ Error de conexión:', err);
-                UI.speak("Error de conexión con el Agente.", "rage", "none");
+                UI.speak("Error de conexión con el Agente.", "rage", "whatsapp");
             });
     }
 
@@ -86,7 +94,7 @@
                     e.stopPropagation();
                     console.log("🚀 Conversión: Clic en WhatsApp");
                     sendVibeEvent('conversion_click', { elementId: 'whatsapp_button', meta: { action: 'user_accepted_help' } });
-                    window.open('https://wa.me/5492645610946?text=Hola,%20tengo%20una%20duda%20con%20un%20producto%20de%20la%20tienda.', '_blank');
+                    window.open('https://wa.me/' + CONFIG.whatsapp_number + '?text=Hola,%20tengo%20una%20duda%20con%20un%20producto%20de%20la%20tienda.', '_blank');
                 }
             },
             checkout: {
@@ -95,8 +103,8 @@
                 action: function (e) {
                     e.preventDefault();
                     e.stopPropagation();
-                    console.log("🛒 Conversión: Clic en Ir al Carrito");
-                    window.location.href = '/cart';
+                    console.log("🛒 Conversión: Clic en Ir al Carrito (Redirigiendo a WhatsApp temporalmente)");
+                    window.open('https://wa.me/' + CONFIG.whatsapp_number + '?text=Hola,%20quiero%20iniciar%20el%20pago%20de%20mi%20carrito.', '_blank');
                 }
             }
         };
@@ -160,7 +168,7 @@
                     const timerId = setTimeout(function () {
                         const timeVisible = Date.now() - observedAt.get(element);
                         console.log("👁️ Interés visual detectado en:", elementId);
-                        // sendVibeEvent('interest', { elementId: elementId, meta: { time_visible: timeVisible, type: 'visual_focus' } });
+                        sendVibeEvent('interest', { elementId: elementId, meta: { time_visible: timeVisible, type: 'visual_focus' } });
                         observer.unobserve(element);
                         elementTimers.delete(element);
                     }, CONFIG.thresholds.time_visible);
@@ -220,20 +228,45 @@
             return;
         }
 
+        // Memoria para detectar la "duda" de talles
+        let selectedSizes = [];
+
+        function handleSizeSelection(selectedValue, sourceId) {
+            if (!selectedValue || selectedValue === 'desconocido') return;
+
+            // Si el cliente no ha seleccionado este talle antes, lo agregamos a la memoria
+            if (!selectedSizes.includes(selectedValue)) {
+                selectedSizes.push(selectedValue);
+            }
+
+            console.log("👕 Variante seleccionada: ", selectedValue, "- Memoria de talles: ", selectedSizes);
+
+            // Si ha navegado por al menos 2 talles distintos, disparamos el evento de duda
+            if (selectedSizes.length >= 2) {
+                console.log("🤔 Duda detectada: cliente buscando entre varios talles.");
+                sendVibeEvent('hesitation', {
+                    elementId: sourceId,
+                    meta: {
+                        action: 'size_doubt',
+                        viewed_sizes: selectedSizes,
+                        last_selected: selectedValue
+                    }
+                });
+                // Reiniciamos la memoria después de disparar para no spamearlo inmediatamente
+                selectedSizes = [];
+            }
+        }
+
         variantSelectors.forEach(function (el) {
             el.addEventListener('change', function (e) {
-                const selectedValue = e.target.value || e.target.innerText || 'desconocido';
-                console.log("👕 Variante seleccionada: ", selectedValue);
-                // CORRECCIÓN: Evento cambiado a 'size_select' para evitar el Toast
-                sendVibeEvent('size_select', { elementId: 'size_selector', meta: { selected_size: selectedValue } });
+                const selectedValue = e.target.value || e.target.innerText;
+                handleSizeSelection(selectedValue, 'size_selector');
             });
 
             if (el.tagName.toLowerCase() !== 'select' && el.tagName.toLowerCase() !== 'input') {
                 el.addEventListener('click', function (e) {
                     const selectedValue = e.target.innerText.trim();
-                    console.log("👕 Variante clickeada: ", selectedValue);
-                    // CORRECCIÓN: Evento cambiado a 'size_select' para evitar el Toast
-                    sendVibeEvent('size_select', { elementId: 'size_button', meta: { selected_size: selectedValue } });
+                    handleSizeSelection(selectedValue, 'size_button');
                 });
             }
         });
@@ -337,7 +370,7 @@
 
         initPriceSensors();
         initSizeSensors();
-        // initVisibilityTracker(); // Desactivado por límite de tokens/fricción
+        initVisibilityTracker(); // Reactivado para procesar evento visual
         initSelectionTracker(mainContainer);
     }
 
