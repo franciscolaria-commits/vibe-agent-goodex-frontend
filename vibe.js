@@ -1,4 +1,4 @@
-**
+/**
  * VIBE AGENT SDK v1.0 (MVP) - TiendaNube Edition
  * Optimistic UI + Mobile Touch Sensors + Fallback + Event Isolation + Memory Optimized
  */
@@ -54,12 +54,14 @@
             .then(function (data) {
                 console.log("📥 Respuesta del Agente:", data);
                 if (data.action === 'toast' && data.message) {
-                    UI.speak(data.message, data.emotion || 'agent', data.button || 'none');
+                    // Fuerza a mostrar siempre un botón. Si el backend no envía uno, usa 'whatsapp' por defecto
+                    const buttonToUse = (data.button && data.button !== 'none') ? data.button : 'whatsapp';
+                    UI.speak(data.message, data.emotion || 'agent', buttonToUse);
                 }
             })
             .catch(function (err) {
                 console.error('❌ Error de conexión:', err);
-                UI.speak("Error de conexión con el Agente.", "rage", "none");
+                UI.speak("Error de conexión con el Agente.", "rage", "whatsapp");
             });
     }
 
@@ -226,20 +228,45 @@
             return;
         }
 
+        // Memoria para detectar la "duda" de talles
+        let selectedSizes = [];
+
+        function handleSizeSelection(selectedValue, sourceId) {
+            if (!selectedValue || selectedValue === 'desconocido') return;
+
+            // Si el cliente no ha seleccionado este talle antes, lo agregamos a la memoria
+            if (!selectedSizes.includes(selectedValue)) {
+                selectedSizes.push(selectedValue);
+            }
+
+            console.log("👕 Variante seleccionada: ", selectedValue, "- Memoria de talles: ", selectedSizes);
+
+            // Si ha navegado por al menos 2 talles distintos, disparamos el evento de duda
+            if (selectedSizes.length >= 2) {
+                console.log("🤔 Duda detectada: cliente buscando entre varios talles.");
+                sendVibeEvent('hesitation', {
+                    elementId: sourceId,
+                    meta: {
+                        action: 'size_doubt',
+                        viewed_sizes: selectedSizes,
+                        last_selected: selectedValue
+                    }
+                });
+                // Reiniciamos la memoria después de disparar para no spamearlo inmediatamente
+                selectedSizes = [];
+            }
+        }
+
         variantSelectors.forEach(function (el) {
             el.addEventListener('change', function (e) {
-                const selectedValue = e.target.value || e.target.innerText || 'desconocido';
-                console.log("👕 Variante seleccionada: ", selectedValue);
-                // CORRECCIÓN: Evento cambiado a 'size_select' para evitar el Toast
-                sendVibeEvent('size_select', { elementId: 'size_selector', meta: { selected_size: selectedValue } });
+                const selectedValue = e.target.value || e.target.innerText;
+                handleSizeSelection(selectedValue, 'size_selector');
             });
 
             if (el.tagName.toLowerCase() !== 'select' && el.tagName.toLowerCase() !== 'input') {
                 el.addEventListener('click', function (e) {
                     const selectedValue = e.target.innerText.trim();
-                    console.log("👕 Variante clickeada: ", selectedValue);
-                    // CORRECCIÓN: Evento cambiado a 'size_select' para evitar el Toast
-                    sendVibeEvent('size_select', { elementId: 'size_button', meta: { selected_size: selectedValue } });
+                    handleSizeSelection(selectedValue, 'size_button');
                 });
             }
         });
