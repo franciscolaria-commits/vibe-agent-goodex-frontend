@@ -222,15 +222,25 @@
 
     function initSizeSensors() {
         const variantSelectors = document.querySelectorAll(`
+            /* TiendaNube */
             .js-product-variants select, 
             .js-variant-select, 
-            input[type="radio"][data-variant], 
             .js-product-variants .btn-variant,
+            /* Shopify Standard & Dawn */
             fieldset input[type="radio"],
             .variant-input input[type="radio"],
             .swatch input[type="radio"],
             .product-form__input input[type="radio"],
-            .product-variant-options input[type="radio"]
+            .product-variant-options input[type="radio"],
+            /* Fallbacks ultragenéricos de formularios de producto */
+            .product-form form input[type="radio"],
+            .product__info-container input[type="radio"],
+            .variant-wrapper input[type="radio"],
+            form[action*="/cart/add"] input[type="radio"],
+            /* Cualquier radio button que contenga datos de variante */
+            input[type="radio"][data-variant],
+            input[type="radio"][name*="id"],
+            input[type="radio"][name*="option"]
         `);
 
         if (variantSelectors.length === 0) {
