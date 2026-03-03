@@ -1,3 +1,4 @@
+**
  * VIBE AGENT SDK v1.0 (MVP) - TiendaNube Edition
  * Optimistic UI + Mobile Touch Sensors + Fallback + Event Isolation + Memory Optimized
  */
@@ -7,9 +8,15 @@
         return 'http://localhost:8000/api/track';
     }
 
+    function _resolveWhatsAppNumber() {
+        if (window.VIBE_CONFIG && window.VIBE_CONFIG.whatsapp_number) return window.VIBE_CONFIG.whatsapp_number;
+        return '5492645610946'; // Fallback por defecto
+    }
+
     const CONFIG = {
         api_endpoint: _resolveApiEndpoint(),
-        thresholds: { visibility: 0.5, time_visible: 20000 },
+        whatsapp_number: _resolveWhatsAppNumber(),
+        thresholds: { visibility: 0.5, time_visible: 15000 },
         colors: { rage: "#ff4d4d", doubt: "#ffc107", agent: "#212529", loading: "#6c757d" }
     };
 
@@ -85,7 +92,7 @@
                     e.stopPropagation();
                     console.log("🚀 Conversión: Clic en WhatsApp");
                     sendVibeEvent('conversion_click', { elementId: 'whatsapp_button', meta: { action: 'user_accepted_help' } });
-                    window.open('https://wa.me/5492645610946?text=Hola,%20tengo%20una%20duda%20con%20un%20producto%20de%20la%20tienda.', '_blank');
+                    window.open('https://wa.me/' + CONFIG.whatsapp_number + '?text=Hola,%20tengo%20una%20duda%20con%20un%20producto%20de%20la%20tienda.', '_blank');
                 }
             },
             checkout: {
@@ -95,7 +102,7 @@
                     e.preventDefault();
                     e.stopPropagation();
                     console.log("🛒 Conversión: Clic en Ir al Carrito (Redirigiendo a WhatsApp temporalmente)");
-                    window.open('https://wa.me/5492645610946?text=Hola,%20quiero%20iniciar%20el%20pago%20de%20mi%20carrito.', '_blank');
+                    window.open('https://wa.me/' + CONFIG.whatsapp_number + '?text=Hola,%20quiero%20iniciar%20el%20pago%20de%20mi%20carrito.', '_blank');
                 }
             }
         };
@@ -251,8 +258,8 @@
             el.addEventListener('mouseenter', function () {
                 priceTimer = setTimeout(function () {
                     console.log("⏱️ Usuario analizando precio (Hover)");
-                    sendVibeEvent('compare_price', { elementId: 'price_hover', meta: { action: 'hover_20s' } });
-                }, 20000);
+                    sendVibeEvent('compare_price', { elementId: 'price_hover', meta: { action: 'hover_15s' } });
+                }, 15000);
             });
             el.addEventListener('mouseleave', function () {
                 if (priceTimer) clearTimeout(priceTimer);
@@ -260,8 +267,8 @@
             el.addEventListener('touchstart', function () {
                 priceTimer = setTimeout(function () {
                     console.log("📱 Usuario manteniendo dedo en precio (Touch)");
-                    sendVibeEvent('compare_price', { elementId: 'price_touch', meta: { action: 'long_press_20s' } });
-                }, 20000);
+                    sendVibeEvent('compare_price', { elementId: 'price_touch', meta: { action: 'long_press_15s' } });
+                }, 15000);
             }, { passive: true });
             el.addEventListener('touchend', function () {
                 if (priceTimer) clearTimeout(priceTimer);
