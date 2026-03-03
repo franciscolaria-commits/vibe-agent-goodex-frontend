@@ -221,39 +221,20 @@
     }
 
     function initSizeSensors() {
-        // Unimos los selectores en un único string separado por comas para usar con matches()
-        const variantSelectors = [
-            '.js-product-variants select',
-            '.js-variant-select',
-            '.js-product-variants .btn-variant',
-            'fieldset input[type="radio"]',
-            '.variant-input input[type="radio"]',
-            '.swatch input[type="radio"]',
-            '.product-form__input input[type="radio"]',
-            '.product-variant-options input[type="radio"]',
-            '.product-form form input[type="radio"]',
-            '.product__info-container input[type="radio"]',
-            '.variant-wrapper input[type="radio"]',
-            'form[action*="/cart/add"] input[type="radio"]',
-            'input[type="radio"][data-variant]',
-            'input[type="radio"][name*="id"]',
-            'input[type="radio"][name*="option"]'
-        ].join(', ');
+        // En tiendas Shopify muy personalizadas, los botones se destruyen y recrean enteros.
+        // La mejor forma de saber si alguien cambió de talle es mirar la URL (?variant=) 
+        // o detectar clicks genéricos en elementos que parezcan talles.
 
-        const productForms = document.querySelectorAll('form[action*="/cart/add"], .js-product-container, [data-vibe="track"]');
-        if (productForms.length === 0) {
-            console.log("⚠️ Vibe Agent: No se encontró área de producto, sensores de talla inactivos.");
-            return;
-        }
-
-        // Memoria para detectar la "duda" de talles
         let selectedSizes = [];
+        let lastReportedValue = null;
 
         function handleSizeSelection(selectedValue, sourceId) {
             if (!selectedValue || selectedValue === 'desconocido') return;
             selectedValue = selectedValue.trim();
 
-            // Si el cliente no ha seleccionado este talle antes, lo agregamos a la memoria
+            if (selectedValue === lastReportedValue) return; // Evitar disparar el mismo click repetido
+            lastReportedValue = selectedValue;
+
             if (!selectedSizes.includes(selectedValue)) {
                 selectedSizes.push(selectedValue);
                 console.log("👕 Variante registrada: ", selectedValue, "- Memoria temporal: ", selectedSizes);
@@ -261,64 +242,59 @@
                 console.log("👕 Variante ya estaba en memoria: ", selectedValue);
             }
 
-            // Si ha navegado por al menos 2 talles distintos, disparamos el evento de duda
             if (selectedSizes.length >= 2) {
                 console.log("🤔 Duda detectada: cliente buscando entre varios talles.");
                 sendVibeEvent('hesitation', {
                     elementId: sourceId,
-                    meta: {
-                        action: 'size_doubt',
-                        viewed_sizes: selectedSizes,
-                        last_selected: selectedValue
-                    }
+                    meta: { action: 'size_doubt', viewed_sizes: selectedSizes, last_selected: selectedValue }
                 });
-                // Reiniciamos la memoria después de disparar para no spamearlo inmediatamente
                 selectedSizes = [];
             }
         }
 
-        // Usamos Delegación de Eventos en el BODY. 
-        // Esto sobrevive a Shopify cuando destruye y vuelve a crear los botones de talle vía AJAX.
-        document.body.addEventListener('change', function (e) {
-            const target = e.target;
-            if (target.matches && target.matches(variantSelectors)) {
-                let selectedValue = target.value;
-
-                if (target.type === 'radio' || target.tagName.toLowerCase() === 'input') {
-                    const label = document.querySelector('label[for="' + target.id + '"]');
-                    if (label) {
-                        selectedValue = label.innerText;
-                    }
-                }
-                selectedValue = selectedValue || target.innerText;
-                handleSizeSelection(selectedValue, 'size_selector_change');
-            }
-        });
-
+        // MÉTODO A: A prueba de reemplazos del DOM. Delegar el click y buscar "hacia arriba" (closest)
         document.body.addEventListener('click', function (e) {
-            const target = e.target;
+            let target = e.target;
 
-            // Shopify a veces dispara el click en el LABEL en lugar del INPUT
-            const isLabelForVariant = target.tagName.toLowerCase() === 'label' && target.getAttribute('for');
-            let matchedTarget = target;
+            // Buscar si clikearon dentro de un label, un swatch, o un contenedor de variante genérico de Shopify
+            const variantContainer = target.closest('label, .swatch, .variant-input, .product-form__input label, [data-value]');
 
-            if (isLabelForVariant) {
-                const inputId = target.getAttribute('for');
-                matchedTarget = document.getElementById(inputId);
-                if (!matchedTarget) return;
-            }
-
-            if (matchedTarget.matches && matchedTarget.matches(variantSelectors)) {
-                // Si no es un select ni un input, tomamos el innerText del click original
-                if (matchedTarget.tagName.toLowerCase() !== 'select' && matchedTarget.tagName.toLowerCase() !== 'input') {
-                    const selectedValue = target.innerText;
-                    handleSizeSelection(selectedValue, 'size_button_click');
-                } else if (isLabelForVariant) {
-                    // Si clicaron un label asociado a input, enviamos el texto de ese label
-                    handleSizeSelection(target.innerText, 'size_label_click');
+            if (variantContainer) {
+                // Prevenir que capture clics en cantidades o botones de compra/agregar al carrito
+                const text = variantContainer.innerText.trim();
+                const lowerText = text.toLowerCase();
+                if (text && text.length < 15 && !lowerText.includes('agreg') && !lowerText.includes('compr') && !lowerText.includes('cart')) {
+                    handleSizeSelection(text, 'size_direct_click');
                 }
             }
         });
+
+        // MÉTODO B: Observador de la URL y del DOM (Prueba de Balas definitiva para Shopify)
+        // La mayoría de los temas de Shopify SIEMPRE cambian la URL (?variant=123...) cuando eliges una talla diferente
+        let lastUrl = location.href;
+        new MutationObserver(() => {
+            const currentUrl = location.href;
+            if (currentUrl !== lastUrl) {
+                lastUrl = currentUrl;
+
+                // Si la URL cambió, esperamos un instante a que Shopify dibuje el DOM nuevo
+                setTimeout(function () {
+                    // Tratar de buscar visualmente cuál es el botón/opción que quedó activo
+                    const activeElement = document.querySelector('input[type="radio"]:checked + label, .is-active, .selected, option:checked, .active');
+
+                    if (activeElement && activeElement.innerText) {
+                        handleSizeSelection(activeElement.innerText, 'size_url_change');
+                    } else {
+                        // Backup final: Si no encontramos el texto en pantalla, extraemos y memorizamos la "Variante ID" directamente de la URL
+                        let urlParams = new URL(currentUrl).searchParams;
+                        let variantId = urlParams.get("variant");
+                        if (variantId) {
+                            handleSizeSelection('ID-' + variantId, 'size_url_fallback');
+                        }
+                    }
+                }, 400); // 400ms es seguro para dar tiempo a las animaciones de carga de los temas de Shopify
+            }
+        }).observe(document.body, { childList: true, subtree: true });
     }
 
     function initPriceSensors() {
