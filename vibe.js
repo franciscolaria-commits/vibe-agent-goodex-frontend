@@ -221,7 +221,17 @@
     }
 
     function initSizeSensors() {
-        const variantSelectors = document.querySelectorAll('.js-product-variants select, .js-variant-select, input[type="radio"][data-variant], .js-product-variants .btn-variant');
+        const variantSelectors = document.querySelectorAll(`
+            .js-product-variants select, 
+            .js-variant-select, 
+            input[type="radio"][data-variant], 
+            .js-product-variants .btn-variant,
+            fieldset input[type="radio"],
+            .variant-input input[type="radio"],
+            .swatch input[type="radio"],
+            .product-form__input input[type="radio"],
+            .product-variant-options input[type="radio"]
+        `);
 
         if (variantSelectors.length === 0) {
             console.log("⚠️ Vibe Agent: No se encontraron selectores de talles/variantes estándar.");
@@ -259,7 +269,18 @@
 
         variantSelectors.forEach(function (el) {
             el.addEventListener('change', function (e) {
-                const selectedValue = e.target.value || e.target.innerText;
+                let selectedValue = e.target.value;
+
+                // Si el valor es de un radio button de Shopify, a veces el label tiene el texto real o el value es algo genérico
+                if (e.target.type === 'radio' || e.target.tagName.toLowerCase() === 'input') {
+                    // Intenta sacar el valor del label asociado si existe
+                    const label = document.querySelector('label[for="' + e.target.id + '"]');
+                    if (label) {
+                        selectedValue = label.innerText.trim();
+                    }
+                }
+
+                selectedValue = selectedValue || e.target.innerText;
                 handleSizeSelection(selectedValue, 'size_selector');
             });
 
